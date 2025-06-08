@@ -6,13 +6,16 @@ import { ConfigOptions } from '../config/env.config';
 import { InjectConnection, MongooseModule } from '@nestjs/mongoose';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-
-import { APP_LOGGER } from 'apps/factories/app.logger';
+import { APP_LOGGER, appLoggerFactory } from 'apps/factories/app.logger';
+import { reqCtxLoggerFactory } from 'apps/factories/request.Context.logger';
+import { RequestContextService } from 'apps/request/requestContext.service';
+import loggerConfig from 'apps/config/logger.config';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       ...ConfigOptions,
+      load: [loggerConfig],
     }),
     MongooseModule.forRootAsync({
       useFactory: async configService => {
@@ -29,7 +32,14 @@ import { APP_LOGGER } from 'apps/factories/app.logger';
     }),
   ],
   controllers: [AppController],
-  providers: [AppService, Logger, Connection],
+  providers: [
+    AppService,
+    Logger,
+    Connection,
+    appLoggerFactory,
+    reqCtxLoggerFactory,
+    RequestContextService,
+  ],
 })
 export class AppModule implements OnApplicationBootstrap {
   constructor(

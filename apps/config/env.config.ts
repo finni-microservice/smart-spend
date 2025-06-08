@@ -1,5 +1,5 @@
 import { registerAs } from '@nestjs/config';
-import Joi from 'joi';
+import * as Joi from 'joi';
 
 export default registerAs('env', () => ({
   nodeEnv: process.env.NODE_ENV || 'development',
