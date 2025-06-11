@@ -11,6 +11,9 @@ export interface TransactionData {
   withdrawal: number;
   deposit: number;
   balance: number;
+  given_to?: string;
+  category?: string;
+  matching_score?: number;
 }
 
 export interface ColumnMapping {
@@ -41,28 +44,20 @@ export class DataExtractorService {
    */
   async extractData(
     file: Express.Multer.File,
-    columnMapping?: ColumnMapping,
+    // columnMapping?: ColumnMapping,
   ): Promise<TransactionData[]> {
-    const fileExtension = file.originalname.split('.').pop()?.toLowerCase();
-    const effectiveMapping = columnMapping || this.defaultColumnMapping;
+    // const fileExtension = file.originalname.split('.').pop()?.toLowerCase();
+    // const effectiveMapping = columnMapping || this.defaultColumnMapping;
 
-    switch (fileExtension) {
-      case 'pdf':
-        return this.extractFromPDF(file);
-      case 'xlsx':
-      case 'xls':
-        return this.extractFromExcel(file, effectiveMapping);
-      case 'csv':
-        return this.extractFromCSV(file, effectiveMapping);
-      default:
-        throw new Error(`Unsupported file type: ${fileExtension}`);
-    }
+    const data = await this.extractDataFromFile(file);
+
+    return data;
   }
 
   /**
    * Extract data from PDF file
    */
-  private async extractFromPDF(file: Express.Multer.File): Promise<TransactionData[]> {
+  private async extractDataFromFile(file: Express.Multer.File): Promise<TransactionData[]> {
     try {
       // Parse PDF
       const data = await pdf(file.buffer);
@@ -79,11 +74,17 @@ export class DataExtractorService {
               "description": "string",
               "withdrawal": number,
               "deposit": number,
-              "balance": number
+              "balance": number,
+              "given_to": "string"
             }
           ]
         }
 
+        The given_to field is the name of the person or entity that the money was given to.
+        If the money was given to a person, the given_to field should be the name of the person.
+        If the money was given to an entity like a shop, a restaurant, a bank, etc., the given_to field should be the name of the entity.
+        If the money is credited to your account, the given_to field should be "Self".
+       
         Text to process:
         ${text}
       `;
@@ -94,6 +95,83 @@ export class DataExtractorService {
     } catch (error) {
       throw new Error(`Error extracting data from PDF: ${error.message}`);
     }
+  }
+
+  private async AutoCategorizeTransactions(transactions: TransactionData[]): Promise<any> {
+    const prompt = `
+      Categorize the following transactions into categories.
+      Return the data in JSON format with the following structure:
+      {
+          "transactions": [
+            {
+              "date": "YYYY-MM-DD",
+              "description": "string",
+              "withdrawal": number,
+              "deposit": number,
+              "balance": number,
+              "given_to": "string",
+              "category": "string",
+              "matching_score": number
+            }
+          ]
+        }
+
+        The matching_score field is the score of the auto categorization based upon the description and the given_to field.
+        Matching score will be in range from 0 to 100
+        The category field is the category of the transaction based upon the description and the given_to field.
+        Auto categorize the transactions based upon the description and the given_to field.
+        The category field could be one of the following or might not be listed here:
+        - Food
+        - Transport
+        - Entertainment
+        - Shopping
+        - Other
+
+        Text to process:
+        ${JSON.stringify(transactions)}
+    `;
+
+    const response = await this.langChainService.generateResponse(prompt);
+    const parsedData = JSON.parse(response);
+    return parsedData.transactions;
+  }
+
+  private async MatchTransactionsCategory(
+    prevTansactions: TransactionData[],
+    currentTransaction: TransactionData,
+  ): Promise<any> {
+    const prompt = `
+      Match the category of the current transaction with the previous transactions.
+      Return the data in JSON format with the following structure:
+      {
+          "transactions": [
+            {
+              "date": "YYYY-MM-DD",
+              "description": "string",
+              "withdrawal": number,
+              "deposit": number,
+              "balance": number,
+              "given_to": "string",
+              "category": "string",
+              "matching_score": number
+            }
+          ]
+        }
+
+        The matching_score field is the score of the auto categorization based upon the category field of the previous transactions.
+        Matching score will be in range from 0 to 100
+        The category field is the category of the transaction based upon the description and the given_to field.
+        Match the category of the current transaction with the previous transactions.
+        
+
+        Text to process:
+        ${JSON.stringify(prevTansactions)}
+        ${JSON.stringify(currentTransaction)}
+    `;
+
+    const response = await this.langChainService.generateResponse(prompt);
+    const parsedData = JSON.parse(response);
+    return parsedData.transactions;
   }
 
   /**

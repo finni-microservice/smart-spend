@@ -1,6 +1,6 @@
-import { Controller, Post, UploadedFile, UseInterceptors, Body } from '@nestjs/common';
+import { Controller, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { DataExtractorService, ColumnMapping } from './service/data-extractor.service';
+import { DataExtractorService } from './service/data-extractor.service';
 
 @Controller('data-extractor')
 export class DataExtractorController {
@@ -10,10 +10,10 @@ export class DataExtractorController {
   @UseInterceptors(FileInterceptor('file'))
   async extractData(
     @UploadedFile() file: Express.Multer.File,
-    @Body() columnMapping?: ColumnMapping,
+    // @Body() columnMapping?: ColumnMapping,
   ) {
     try {
-      const data = await this.dataExtractorService.extractData(file, columnMapping);
+      const data = await this.dataExtractorService.extractData(file);
 
       // Validate the extracted data
       if (!this.dataExtractorService.validateData(data)) {
