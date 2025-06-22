@@ -21,7 +21,7 @@ dependencies:
     specifier: ^10.0.0
     version: 10.4.18(reflect-metadata@0.1.14)(rxjs@7.8.2)
   '@nestjs/config':
-    specifier: ^3.0.0
+    specifier: ^3.3.0
     version: 3.3.0(@nestjs/common@10.4.18)(rxjs@7.8.2)
   '@nestjs/core':
     specifier: ^10.0.0
@@ -83,6 +83,9 @@ dependencies:
   sequelize-typescript:
     specifier: ^2.1.6
     version: 2.1.6(@types/node@20.17.57)(@types/validator@13.15.1)(reflect-metadata@0.1.14)(sequelize@6.37.7)
+  stripe:
+    specifier: ^18.2.1
+    version: 18.2.1(@types/node@20.17.57)
   uuid:
     specifier: ^11.1.0
     version: 11.1.0
@@ -5899,6 +5902,19 @@ packages:
     resolution: {integrity: sha512-6fPc+R4ihwqP6N/aIv2f1gMH8lOVtWQHoqC4yK6oSDVVocumAsfCqjkXnqiYMhmMwS/mEHLp7Vehlt3ql6lEig==}
     engines: {node: '>=8'}
     dev: true
+
+  /stripe@18.2.1(@types/node@20.17.57):
+    resolution: {integrity: sha512-GwB1B7WSwEBzW4dilgyJruUYhbGMscrwuyHsPUmSRKrGHZ5poSh2oU9XKdii5BFVJzXHn35geRvGJ6R8bYcp8w==}
+    engines: {node: '>=12.*'}
+    peerDependencies:
+      '@types/node': '>=12.x.x'
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
+    dependencies:
+      '@types/node': 20.17.57
+      qs: 6.13.0
+    dev: false
 
   /strtok3@10.2.2:
     resolution: {integrity: sha512-Xt18+h4s7Z8xyZ0tmBoRmzxcop97R4BAh+dXouUDCYn+Em+1P3qpkUfI5ueWLT8ynC5hZ+q4iPEmGG1urvQGBg==}

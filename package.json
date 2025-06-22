@@ -20,7 +20,7 @@
     "@langchain/core": "^0.3.57",
     "@langchain/openai": "^0.5.12",
     "@nestjs/common": "^10.0.0",
-    "@nestjs/config": "^3.0.0",
+    "@nestjs/config": "^3.3.0",
     "@nestjs/core": "^10.0.0",
     "@nestjs/mongoose": "^10.0.0",
     "@nestjs/platform-express": "^10.0.0",
@@ -41,6 +41,7 @@
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.8.1",
     "sequelize-typescript": "^2.1.6",
+    "stripe": "^18.2.1",
     "uuid": "^11.1.0",
     "winston": "^3.17.0",
     "xlsx": "^0.18.5"
