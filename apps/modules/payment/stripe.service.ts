@@ -11,10 +11,8 @@ export class StripeService {
   // Example price IDs (replace with your real Stripe price IDs)
   private readonly priceIds = {
     freemium: null, // No price for free tier
-    core: 'price_5usd_monthly',
-    pro: 'price_10usd_monthly', // Replace with real Stripe price ID
-    core_annual: 'price_48usd_annual', // Replace with real Stripe price ID
-    pro_annual: 'price_96usd_annual', // Replace with real Stripe price ID
+    monthly: 'price_5usd_monthly', // $5/month
+    annual: 'price_48usd_annual', // $48/year ($4/month)
   };
 
   constructor() {
@@ -27,7 +25,7 @@ export class StripeService {
 
   async createSubscription(
     stripeCustomerId: string,
-    plan: 'core' | 'pro' | 'core_annual' | 'pro_annual',
+    plan: 'monthly' | 'annual',
     paymentMethodId: string,
     trialDays?: number,
   ): Promise<Stripe.Subscription> {
@@ -50,10 +48,7 @@ export class StripeService {
     });
   }
 
-  async updateSubscription(
-    subscriptionId: string,
-    newPlan: 'core' | 'pro' | 'core_annual' | 'pro_annual',
-  ) {
+  async updateSubscription(subscriptionId: string, newPlan: 'monthly' | 'annual') {
     const priceId = this.priceIds[newPlan];
     if (!priceId) throw new Error('Invalid or missing price ID for plan');
     return this.stripe.subscriptions.update(subscriptionId, {
@@ -104,10 +99,8 @@ export class StripeService {
           // Determine plan from subscription items
           const planId = subscription.items.data[0]?.price.id;
           let currentPlan = 'freemium';
-          if (planId === this.priceIds.core) currentPlan = 'core';
-          else if (planId === this.priceIds.pro) currentPlan = 'pro';
-          else if (planId === this.priceIds.core_annual) currentPlan = 'core_annual';
-          else if (planId === this.priceIds.pro_annual) currentPlan = 'pro_annual';
+          if (planId === this.priceIds.monthly) currentPlan = 'monthly';
+          else if (planId === this.priceIds.annual) currentPlan = 'annual';
           profile.currentPlan = currentPlan;
           const renewalTimestamp = (subscription as any).current_period_end;
           profile.planRenewalDate = renewalTimestamp ? new Date(renewalTimestamp * 1000) : null;
@@ -173,7 +166,7 @@ export class StripeService {
    */
   async createCheckoutSession(
     stripeCustomerId: string,
-    plan: 'core' | 'pro' | 'core_annual' | 'pro_annual',
+    plan: 'monthly' | 'annual',
     successUrl: string,
     cancelUrl: string,
   ) {

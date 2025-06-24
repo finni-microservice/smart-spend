@@ -24,5 +24,14 @@ export const ConfigOptions = {
     INJECT_CID: Joi.boolean().default(false),
     LOGGER_MIN_LEVEL: Joi.string().default('debug'),
     LOGGER_DISABLE: Joi.boolean().default(false),
+    // PostgreSQL Configuration
+    POSTGRES_DB_HOST: Joi.string().required(),
+    POSTGRES_DB_PORT: Joi.number().default(5432),
+    POSTGRES_DB_USERNAME: Joi.string().required(),
+    POSTGRES_DB_PASSWORD: Joi.string().required(),
+    POSTGRES_DB_NAME: Joi.string().required(),
+    // Stripe Configuration
+    STRIPE_SECRET_KEY: Joi.string().required(),
+    STRIPE_WEBHOOK_SECRET: Joi.string().required(),
   }),
 };

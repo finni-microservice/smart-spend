@@ -1,5 +1,13 @@
 import { ConfigService } from '@nestjs/config';
 import { Sequelize } from 'sequelize-typescript';
+import { Profile } from './models/profile.model';
+import { Category } from './models/category.model';
+import { Transaction } from './models/transaction.model';
+import { ExtractedTransaction } from './models/extracted-transaction.model';
+import { ImportSession } from './models/import-session.model';
+import { PendingTransaction } from './models/pending-transaction.model';
+import { TransactionMappingPattern } from './models/transaction-mapping-pattern.model';
+import { UserOnboarding } from './models/user-onboarding.model';
 
 export const postgresDatabaseProviders = [
   {
@@ -21,7 +29,18 @@ export const postgresDatabaseProviders = [
         },
       });
 
-      // Don't add models here - they will be added by individual modules
+      // Add all models to Sequelize
+      sequelize.addModels([
+        Profile,
+        Category,
+        Transaction,
+        ExtractedTransaction,
+        ImportSession,
+        PendingTransaction,
+        TransactionMappingPattern,
+        UserOnboarding,
+      ]);
+
       await sequelize.sync();
       return sequelize;
     },

@@ -17,7 +17,7 @@ export class StripeController {
     @Body()
     body: {
       stripeCustomerId: string;
-      plan: 'core' | 'pro' | 'core_annual' | 'pro_annual';
+      plan: 'monthly' | 'annual';
       paymentMethodId: string;
       trialDays?: number;
     },
@@ -35,7 +35,7 @@ export class StripeController {
     @Body()
     body: {
       subscriptionId: string;
-      newPlan: 'core' | 'pro' | 'core_annual' | 'pro_annual';
+      newPlan: 'monthly' | 'annual';
     },
   ) {
     return this.stripeService.updateSubscription(body.subscriptionId, body.newPlan);
@@ -82,7 +82,7 @@ export class StripeController {
     @Body()
     body: {
       stripeCustomerId: string;
-      plan: 'core' | 'pro' | 'core_annual' | 'pro_annual';
+      plan: 'monthly' | 'annual';
       successUrl: string;
       cancelUrl: string;
     },
