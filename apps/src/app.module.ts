@@ -1,10 +1,8 @@
 import { Inject, Logger, Module, OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Logger as WLogger } from 'winston';
-import mongoose, { Connection } from 'mongoose';
 import { Sequelize } from 'sequelize-typescript';
 import { ConfigOptions } from '../config/env.config';
-import { InjectConnection, MongooseModule } from '@nestjs/mongoose';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { APP_LOGGER, appLoggerFactory } from 'apps/factories/app.logger';
@@ -22,19 +20,6 @@ import { RequestContextModule } from 'apps/request/requestContext.module';
       ...ConfigOptions,
       load: [loggerConfig],
     }),
-    MongooseModule.forRootAsync({
-      useFactory: async configService => {
-        if (configService.get('NODE_ENV') === 'development') {
-          mongoose.set('debug', true);
-        }
-        return {
-          uri: configService.get('MONGO_URI'),
-          dbName: configService.get('MONGO_DB_NAME'),
-        };
-      },
-      inject: [ConfigService],
-      // connectionName: 'nabiq-connection',
-    }),
     PostgresqlModule,
     StripeModule,
     DataExtractorModule,
@@ -42,33 +27,47 @@ import { RequestContextModule } from 'apps/request/requestContext.module';
     RequestContextModule,
   ],
   controllers: [AppController],
-  providers: [AppService, Logger, Connection, appLoggerFactory, reqCtxLoggerFactory],
+  providers: [AppService, Logger, appLoggerFactory, reqCtxLoggerFactory],
 })
 export class AppModule implements OnApplicationBootstrap {
   constructor(
     private readonly configService: ConfigService,
     @Inject(APP_LOGGER) private readonly logger: WLogger,
-    @InjectConnection() private readonly connection: Connection,
     @Inject('SEQUELIZE') private readonly sequelize: Sequelize,
   ) {
-    // MongoDB connection events
-    this.connection.on('open', () => {
-      this.logger.info('MongoDB connection established successfully');
-    });
+    // PostgreSQL connection events - only if it's a real Sequelize instance
+    if (this.sequelize && typeof this.sequelize.authenticate === 'function') {
+      try {
+        this.sequelize
+          .authenticate()
+          .then(() => {
+            this.logger.info('PostgreSQL connection established successfully');
+          })
+          .catch(error => {
+            const nodeEnv = this.configService.get('NODE_ENV');
+            const isDev = ['development', 'local'].includes(nodeEnv);
 
-    this.connection.on('error', _error => {
-      this.logger.error('MongoDB connection error:', _error);
-    });
+            if (isDev) {
+              this.logger.warn(
+                'PostgreSQL connection failed in development mode - continuing without database',
+              );
+            } else {
+              this.logger.error('PostgreSQL connection error:', error);
+            }
+          });
+      } catch (error) {
+        const nodeEnv = this.configService.get('NODE_ENV');
+        const isDev = ['development', 'local'].includes(nodeEnv);
 
-    // PostgreSQL connection events
-    this.sequelize
-      .authenticate()
-      .then(() => {
-        this.logger.info('PostgreSQL connection established successfully');
-      })
-      .catch(error => {
-        this.logger.error('PostgreSQL connection error:', error);
-      });
+        if (isDev) {
+          this.logger.warn('PostgreSQL not available in development mode');
+        } else {
+          this.logger.error('PostgreSQL initialization error:', error);
+        }
+      }
+    } else {
+      this.logger.info('Running in development mode without PostgreSQL connection');
+    }
   }
 
   onApplicationBootstrap() {
