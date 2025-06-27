@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "nest start --watch",
     "build": "nest build",
+    "vercel-build": "pnpm install --no-frozen-lockfile && nest build",
     "start": "node dist/apps/src/main",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
