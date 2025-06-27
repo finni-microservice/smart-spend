@@ -51,6 +51,21 @@ export class Profile extends Model<Profile> {
   @Column(DataType.DATE)
   updated_at: Date;
 
+  @Column(DataType.STRING)
+  stripeCustomerId: string;
+
+  @Column(DataType.STRING)
+  stripeSubscriptionId: string;
+
+  @Column(DataType.STRING)
+  subscriptionStatus: string;
+
+  @Column(DataType.STRING)
+  currentPlan: string; // freemium, core, pro
+
+  @Column(DataType.DATE)
+  planRenewalDate: Date;
+
   @HasMany(() => Category, 'user_id')
   categories: Category[];
 

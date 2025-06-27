@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  app:
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - DEBUG=*
+    command: pnpm run dev
+
+  redis:
+    volumes:
+      - ./redis-dev.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf --loglevel verbose 

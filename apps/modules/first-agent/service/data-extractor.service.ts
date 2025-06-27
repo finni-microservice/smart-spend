@@ -1,6 +1,4 @@
 import { Injectable } from '@nestjs/common';
-
-import { LangChainService } from '../../../libs/langchain/langchain.service';
 import * as pdf from 'pdf-parse';
 import * as XLSX from 'xlsx';
 import * as csv from 'csv-parse';
@@ -34,7 +32,7 @@ export class DataExtractorService {
     balance: 'Balance',
   };
 
-  constructor(private readonly langChainService: LangChainService) {}
+  constructor() {}
 
   /**
    * Extract text from various file formats
@@ -56,6 +54,7 @@ export class DataExtractorService {
         throw new Error(`Unsupported file format: ${fileExtension}`);
     }
   }
+
   /**
    * Extract data from uploaded file
    * @param file The uploaded file
@@ -64,128 +63,269 @@ export class DataExtractorService {
    */
   async extractData(
     file: Express.Multer.File,
-    // columnMapping?: ColumnMapping,
+    columnMapping?: ColumnMapping,
   ): Promise<TransactionData[]> {
-    const text = await this.extractText(file);
-    const data = await this.extractDataFromFile(text);
+    const fileExtension = file.originalname.split('.').pop()?.toLowerCase();
 
-    return data;
+    // Handle structured files (CSV, Excel) differently from unstructured (PDF)
+    if (fileExtension === 'csv' || fileExtension === 'xlsx' || fileExtension === 'xls') {
+      return this.extractStructuredData(file, columnMapping);
+    } else if (fileExtension === 'pdf') {
+      const text = await this.extractText(file);
+      return this.parseTextToTransactions(text);
+    }
+
+    throw new Error(`Unsupported file format: ${fileExtension}`);
   }
 
   /**
-   * Extract data from PDF file
+   * Extract structured data from CSV/Excel files
    */
-  private async extractDataFromFile(text: string): Promise<TransactionData[]> {
-    try {
-      // Use LangChain to extract structured data
-      const prompt = `
-        Extract transaction data from the following text. 
-        Return the data in JSON format with the following structure:
-        {
-          "transactions": [
-            {
-              "date": "YYYY-MM-DD",
-              "description": "string",
-              "withdrawal": number,
-              "deposit": number,
-              "balance": number,
-              "given_to": "string"
-            }
-          ]
+  private async extractStructuredData(
+    file: Express.Multer.File,
+    columnMapping?: ColumnMapping,
+  ): Promise<TransactionData[]> {
+    const mapping = columnMapping || this.defaultColumnMapping;
+    const fileExtension = file.originalname.split('.').pop()?.toLowerCase();
+
+    let rawData: any[] = [];
+
+    if (fileExtension === 'csv') {
+      rawData = await this.parseCSVToObjects(file);
+    } else {
+      rawData = await this.parseExcelToObjects(file);
+    }
+
+    return rawData.map(row => this.mapRowToTransaction(row, mapping)).filter(Boolean);
+  }
+
+  /**
+   * Parse CSV file to array of objects
+   */
+  private async parseCSVToObjects(file: Express.Multer.File): Promise<any[]> {
+    return new Promise((resolve, reject) => {
+      const results: any[] = [];
+
+      const parser = csv.parse({
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
+      });
+
+      parser.on('readable', () => {
+        let record;
+        while ((record = parser.read())) {
+          results.push(record);
         }
+      });
 
-        The given_to field is the name of the person or entity that the money was given to.
-        If the money was given to a person, the given_to field should be the name of the person.
-        If the money was given to an entity like a shop, a restaurant, a bank, etc., the given_to field should be the name of the entity.
-        If the money is credited to your account, the given_to field should be "Self".
-       
-        Text to process:
-        ${text}
-      `;
+      parser.on('error', error => {
+        reject(new Error(`Error parsing CSV: ${error.message}`));
+      });
 
-      const response = await this.langChainService.generateResponse(prompt);
-      const parsedData = JSON.parse(response);
-      return parsedData.transactions;
+      parser.on('end', () => {
+        resolve(results);
+      });
+
+      parser.write(file.buffer);
+      parser.end();
+    });
+  }
+
+  /**
+   * Parse Excel file to array of objects
+   */
+  private async parseExcelToObjects(file: Express.Multer.File): Promise<any[]> {
+    try {
+      const workbook = XLSX.read(file.buffer, { type: 'buffer' });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+
+      // Convert to JSON with header row as keys
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+      if (jsonData.length < 2) {
+        throw new Error('File must contain header row and at least one data row');
+      }
+
+      const headers = jsonData[0] as string[];
+      const rows = jsonData.slice(1) as any[][];
+
+      return rows.map(row => {
+        const obj: any = {};
+        headers.forEach((header, index) => {
+          obj[header] = row[index];
+        });
+        return obj;
+      });
     } catch (error) {
-      throw new Error(`Error extracting data from PDF: ${error.message}`);
+      throw new Error(`Error parsing Excel: ${error.message}`);
     }
   }
 
-  private async AutoCategorizeTransactions(transactions: TransactionData[]): Promise<any> {
-    const prompt = `
-      Categorize the following transactions into categories.
-      Return the data in JSON format with the following structure:
-      {
-          "transactions": [
-            {
-              "date": "YYYY-MM-DD",
-              "description": "string",
-              "withdrawal": number,
-              "deposit": number,
-              "balance": number,
-              "given_to": "string",
-              "category": "string",
-              "matching_score": number
-            }
-          ]
-        }
+  /**
+   * Map a raw data row to TransactionData
+   */
+  private mapRowToTransaction(row: any, mapping: ColumnMapping): TransactionData | null {
+    try {
+      const date = this.parseDate(row[mapping.date]);
+      const description = String(row[mapping.description] || '').trim();
+      const withdrawal = this.parseAmount(row[mapping.withdrawal]);
+      const deposit = this.parseAmount(row[mapping.deposit]);
+      const balance = this.parseAmount(row[mapping.balance]);
 
-        The matching_score field is the score of the auto categorization based upon the description and the given_to field.
-        Matching score will be in range from 0 to 100
-        The category field is the category of the transaction based upon the description and the given_to field.
-        Auto categorize the transactions based upon the description and the given_to field.
-        The category field could be one of the following or might not be listed here:
-        - Food
-        - Transport
-        - Entertainment
-        - Shopping
-        - Other
+      // Skip rows with invalid data
+      if (!date || !description) {
+        return null;
+      }
 
-        Text to process:
-        ${JSON.stringify(transactions)}
-    `;
-
-    const response = await this.langChainService.generateResponse(prompt);
-    const parsedData = JSON.parse(response);
-    return parsedData.transactions;
+      return {
+        date,
+        description,
+        withdrawal,
+        deposit,
+        balance,
+        given_to: this.extractGivenTo(description),
+        category: this.basicCategorization(description),
+        matching_score: 50, // Default score for rule-based categorization
+      };
+    } catch (error) {
+      console.warn('Skipping invalid row:', row, error.message);
+      return null;
+    }
   }
 
-  private async MatchTransactionsCategory(
-    prevTansactions: TransactionData[],
-    currentTransaction: TransactionData,
-  ): Promise<any> {
-    const prompt = `
-      Match the category of the current transaction with the previous transactions.
-      Return the data in JSON format with the following structure:
-      {
-          "transactions": [
-            {
-              "date": "YYYY-MM-DD",
-              "description": "string",
-              "withdrawal": number,
-              "deposit": number,
-              "balance": number,
-              "given_to": "string",
-              "category": "string",
-              "matching_score": number
+  /**
+   * Parse date string to ISO format
+   */
+  private parseDate(dateValue: any): string {
+    if (!dateValue) return '';
+
+    try {
+      const date = new Date(dateValue);
+      if (isNaN(date.getTime())) {
+        // Try parsing common date formats
+        const formats = [
+          /(\d{1,2})\/(\d{1,2})\/(\d{4})/, // MM/DD/YYYY or DD/MM/YYYY
+          /(\d{4})-(\d{1,2})-(\d{1,2})/, // YYYY-MM-DD
+          /(\d{1,2})-(\d{1,2})-(\d{4})/, // DD-MM-YYYY
+        ];
+
+        for (const format of formats) {
+          const match = String(dateValue).match(format);
+          if (match) {
+            const [, p1, p2, p3] = match;
+            // Assume DD/MM/YYYY format
+            const parsedDate = new Date(parseInt(p3), parseInt(p2) - 1, parseInt(p1));
+            if (!isNaN(parsedDate.getTime())) {
+              return parsedDate.toISOString().split('T')[0];
             }
-          ]
+          }
         }
+        return '';
+      }
+      return date.toISOString().split('T')[0];
+    } catch {
+      return '';
+    }
+  }
 
-        The matching_score field is the score of the auto categorization based upon the category field of the previous transactions.
-        Matching score will be in range from 0 to 100
-        The category field is the category of the transaction based upon the description and the given_to field.
-        Match the category of the current transaction with the previous transactions.
-        
+  /**
+   * Parse amount string to number
+   */
+  private parseAmount(value: any): number {
+    if (typeof value === 'number') return value;
+    if (!value) return 0;
 
-        Text to process:
-        ${JSON.stringify(prevTansactions)}
-        ${JSON.stringify(currentTransaction)}
-    `;
+    // Remove currency symbols and commas
+    const cleanValue = String(value)
+      .replace(/[₹$€£,\s]/g, '')
+      .trim();
+    const number = parseFloat(cleanValue);
+    return isNaN(number) ? 0 : number;
+  }
 
-    const response = await this.langChainService.generateResponse(prompt);
-    const parsedData = JSON.parse(response);
-    return parsedData.transactions;
+  /**
+   * Extract "given_to" from description using basic rules
+   */
+  private extractGivenTo(description: string): string {
+    if (!description) return 'Unknown';
+
+    // Common patterns for payee extraction
+    const patterns = [
+      /TO\s+([^\/\s]+)/i,
+      /UPI-([^\/\s]+)/i,
+      /IMPS-([^\/\s]+)/i,
+      /NEFT-([^\/\s]+)/i,
+    ];
+
+    for (const pattern of patterns) {
+      const match = description.match(pattern);
+      if (match) {
+        return match[1].trim();
+      }
+    }
+
+    // If no pattern matches, return first few words
+    const words = description.split(/\s+/);
+    return words.slice(0, 2).join(' ') || 'Unknown';
+  }
+
+  /**
+   * Basic categorization based on keywords
+   */
+  private basicCategorization(description: string): string {
+    const desc = description.toLowerCase();
+
+    const categories = {
+      Food: ['restaurant', 'cafe', 'food', 'dining', 'swiggy', 'zomato', 'dominos'],
+      Transport: ['uber', 'ola', 'taxi', 'metro', 'bus', 'fuel', 'petrol'],
+      Entertainment: ['movie', 'cinema', 'netflix', 'spotify', 'game'],
+      Shopping: ['amazon', 'flipkart', 'mall', 'store', 'shopping'],
+      Banking: ['atm', 'bank', 'interest', 'charges', 'fee'],
+      Utilities: ['electricity', 'water', 'gas', 'internet', 'mobile'],
+    };
+
+    for (const [category, keywords] of Object.entries(categories)) {
+      if (keywords.some(keyword => desc.includes(keyword))) {
+        return category;
+      }
+    }
+
+    return 'Other';
+  }
+
+  /**
+   * Basic text parsing for PDF (simplified without AI)
+   */
+  private parseTextToTransactions(text: string): TransactionData[] {
+    // This is a basic implementation - in production you'd want more sophisticated parsing
+    const lines = text.split('\n').filter(line => line.trim());
+    const transactions: TransactionData[] = [];
+
+    for (const line of lines) {
+      // Look for lines that might contain transaction data
+      // This is a very basic pattern - you'd need to customize based on your PDF format
+      const dateMatch = line.match(/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}/);
+      const amountMatch = line.match(/[\d,]+\.\d{2}/);
+
+      if (dateMatch && amountMatch) {
+        const transaction: TransactionData = {
+          date: this.parseDate(dateMatch[0]),
+          description: line.replace(dateMatch[0], '').replace(amountMatch[0], '').trim(),
+          withdrawal: 0,
+          deposit: this.parseAmount(amountMatch[0]),
+          balance: 0,
+          given_to: 'Unknown',
+          category: 'Other',
+          matching_score: 30, // Lower score for PDF parsing
+        };
+
+        transactions.push(transaction);
+      }
+    }
+
+    return transactions;
   }
 
   /**
