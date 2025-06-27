@@ -2,7 +2,7 @@ import { Inject, Logger, Module, OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Logger as WLogger } from 'winston';
 import { Sequelize } from 'sequelize-typescript';
-import { ConfigOptions } from '../config/env.config';
+import envConfig, { ConfigOptions } from '../config/env.config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { APP_LOGGER, appLoggerFactory } from 'apps/factories/app.logger';
@@ -18,7 +18,7 @@ import { RequestContextModule } from 'apps/request/requestContext.module';
   imports: [
     ConfigModule.forRoot({
       ...ConfigOptions,
-      load: [loggerConfig],
+      load: [envConfig, loggerConfig],
     }),
     PostgresqlModule,
     StripeModule,

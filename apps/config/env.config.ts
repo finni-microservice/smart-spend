@@ -8,6 +8,13 @@ export default registerAs('env', () => ({
   axiomToken: process.env.AXIOM_TOKEN,
   axiomOrgId: process.env.AXIOM_ORG_ID,
   axiomDataset: process.env.AXIOM_DATASET || '',
+  stripe: {
+    secretKey: process.env.STRIPE_SECRET_KEY,
+    publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+    monthlyPriceId: process.env.STRIPE_MONTHLY_PRICE_ID,
+    annualPriceId: process.env.STRIPE_ANNUAL_PRICE_ID,
+  },
 }));
 
 export const ConfigOptions = {
@@ -44,16 +51,31 @@ export const ConfigOptions = {
       then: Joi.required(),
       otherwise: Joi.optional().default('spend_smart_db'),
     }),
-    // Stripe Configuration - Optional for local/development
+    // Stripe Configuration - Required for payment functionality
     STRIPE_SECRET_KEY: Joi.string().when('NODE_ENV', {
       is: Joi.string().valid('production', 'staging'),
       then: Joi.required(),
       otherwise: Joi.optional().default('sk_test_dummy_key'),
     }),
+    STRIPE_PUBLISHABLE_KEY: Joi.string().when('NODE_ENV', {
+      is: Joi.string().valid('production', 'staging'),
+      then: Joi.required(),
+      otherwise: Joi.optional().default('pk_test_dummy_key'),
+    }),
     STRIPE_WEBHOOK_SECRET: Joi.string().when('NODE_ENV', {
       is: Joi.string().valid('production', 'staging'),
       then: Joi.required(),
       otherwise: Joi.optional().default('whsec_dummy_secret'),
+    }),
+    STRIPE_MONTHLY_PRICE_ID: Joi.string().when('NODE_ENV', {
+      is: Joi.string().valid('production', 'staging'),
+      then: Joi.required(),
+      otherwise: Joi.optional().default('price_test_monthly'),
+    }),
+    STRIPE_ANNUAL_PRICE_ID: Joi.string().when('NODE_ENV', {
+      is: Joi.string().valid('production', 'staging'),
+      then: Joi.required(),
+      otherwise: Joi.optional().default('price_test_annual'),
     }),
     // Optional Axiom logging
     AXIOM_TOKEN: Joi.string().optional(),
