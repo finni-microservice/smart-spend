@@ -141,3 +141,5 @@ This project is private and unlicensed.
 - NestJS team for the amazing framework
 - MongoDB for the database
 - Axiom for logging infrastructure
+
+# smart-spend
