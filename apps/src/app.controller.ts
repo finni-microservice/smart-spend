@@ -20,6 +20,11 @@ export class AppController {
     });
   }
 
+  @Get('health')
+  async healthCheck(): Promise<string> {
+    return 'OK';
+  }
+
   @Get()
   async getHello(): Promise<string> {
     this.logger.info('Getting Hello from AppController');
